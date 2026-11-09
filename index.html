@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>오늘의 근무표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 고정 상단(날짜·이동) → 요약 → 주간 → 팀 필터 → 팀 명단(PC 3열/중간 2열/폰 1열) → 월 전체(보조 탭) */
+:root{--bg:#f1f3f5;--card:#fff;--ink:#16202a;--sub:#4a5866;--mute:#6b7886;--line:#e4e8ec;--soft:#f6f8f9;--accent:#0b5560;--accentbg:#e0eff1;--on:#fff;
+--off:#a8400f;--offbg:#fcefe6;--leave:#2557c4;--leavebg:#e8effd;--warn:#7a5a00;--warnbg:#fff5d4;--danger:#a11212;--dangerbg:#fde6e6;--c0:#ece6fa;--c1:#fbe6ee;--c2:#e2f3e6;--c3:#e0f1f4;--c4:#f3ecdc;--d0:#b9a6ea;--d1:#eaa3bd;--d2:#8fcf9f;--d3:#86c8d3;--d4:#d5bf8a;--c5:#e8ebf0;--d5:#a9b3c1;--away:#0b6b5c;--awaybg:#dff1ed}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1418;--card:#182028;--ink:#edf1f5;--sub:#b5c0cc;--mute:#93a1b0;--line:#2a3541;--soft:#1d2731;--accent:#6fd0d8;--accentbg:#17343a;--on:#0f1418;--off:#ff9a63;--offbg:#40251a;--leave:#8cb0ff;--leavebg:#1d2c52;--warn:#f5d77a;--warnbg:#3b3012;--danger:#ffb4b4;--dangerbg:#4a1c1c;--c0:#2a2540;--c1:#3a2430;--c2:#1f3a2a;--c3:#1d3a40;--c4:#3a3220;--d0:#6f5fa8;--d1:#a8607b;--d2:#4f8a62;--d3:#4a8f9a;--d4:#9a8350;--c5:#262d38;--d5:#566274;--away:#7fe0cf;--awaybg:#173a35;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1418;--card:#182028;--ink:#edf1f5;--sub:#b5c0cc;--mute:#93a1b0;--line:#2a3541;--soft:#1d2731;--accent:#6fd0d8;--accentbg:#17343a;--on:#0f1418;--off:#ff9a63;--offbg:#40251a;--leave:#8cb0ff;--leavebg:#1d2c52;--warn:#f5d77a;--warnbg:#3b3012;--danger:#ffb4b4;--dangerbg:#4a1c1c;--c0:#2a2540;--c1:#3a2430;--c2:#1f3a2a;--c3:#1d3a40;--c4:#3a3220;--d0:#6f5fa8;--d1:#a8607b;--d2:#4f8a62;--d3:#4a8f9a;--d4:#9a8350;--c5:#262d38;--d5:#566274;--away:#7fe0cf;--awaybg:#173a35;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+button,input{font:inherit;color:var(--ink)}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,.day:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+/* 상단 고정: 날짜와 이동 버튼만 */
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0}
+.date{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.date .tag{font-size:13px;font-weight:700;background:var(--accent);color:var(--on);border-radius:999px;padding:2px 10px;letter-spacing:0}
+.date .tag.hol{background:var(--off);color:#fff}
+.nav{display:flex;gap:6px;flex:none}
+.nav button{min-width:44px;min-height:44px;padding:0 14px;border:1px solid var(--line);background:var(--card);border-radius:10px;font-weight:500}
+.nav #today{font-weight:700;color:var(--accent)}
+.nav #today.on{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.notice{border-radius:10px;padding:10px 14px;font-size:15px;line-height:1.6}
+.notice b{display:block}
+.notice.danger{background:var(--dangerbg);color:var(--danger);border:2px solid var(--danger)}
+.notice.warn{background:var(--warnbg);color:var(--warn)}
+.notice.info{background:var(--card);color:var(--sub);border:1px solid var(--line);font-size:14px}
+.notice ul{margin:4px 0 8px;padding-left:20px}
+.notice button{min-height:36px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:8px;padding:0 14px;font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
+/* 요약 */
+.sum{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.num span{display:block;font-size:13px;color:var(--sub)}
+.num b{font-size:26px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.num b small{font-size:14px;font-weight:500;color:var(--mute)}
+.num.o b{color:var(--off)}.num.l b{color:var(--leave)}
+.leadline{font-size:14px;color:var(--sub);border-top:1px solid var(--line);padding-top:8px}
+.leadline strong{color:var(--ink)}
+.outs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+.outs .t{color:var(--sub);margin-right:2px}
+.ob{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:3px 10px;font-weight:700;line-height:1.5}
+.ob small{font-size:12px;font-weight:600}
+.ob.off{background:var(--offbg);color:var(--off)}.ob.leave{background:var(--leavebg);color:var(--leave)}.ob.unk{background:var(--warnbg);color:var(--warn)}
+.allin{color:var(--accent);font-weight:700}
+/* 주간 */
+.weekbox{padding:10px 12px}
+.weekhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:14px;color:var(--sub)}
+.pick{display:inline-flex;align-items:center;gap:6px}
+.pick span{white-space:nowrap}
+.pick input{min-height:36px;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:0 8px;font-size:14px}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.day{border:1px solid transparent;border-radius:8px;padding:5px 0;text-align:center;cursor:pointer;background:var(--soft);font-size:12px;color:var(--mute);min-width:0;min-height:52px}
+.day b{display:block;font-size:17px;line-height:1.3;color:var(--ink);font-variant-numeric:tabular-nums}
+.day i{font-style:normal;display:block;font-size:12px;font-weight:700;line-height:1.2;color:var(--off)}
+.day i.z{color:var(--mute);font-weight:400}
+.day.sel{background:var(--accent)}
+.day.sel,.day.sel b,.day.sel i,.day.sel span{color:var(--on)!important}
+.day.today:not(.sel){border-color:var(--accent)}
+.sun{color:var(--off)!important}.sat{color:var(--leave)!important}
+/* 탭 + 팀 필터 */
+.tools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button,.fl button{min-height:36px;border:0;background:transparent;padding:0 14px;border-radius:8px;font-size:14px;font-weight:500;color:var(--sub)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on);font-weight:700}
+.fl{display:flex;flex-wrap:wrap;gap:6px}
+.fl button{border:1px solid var(--line);background:var(--card);padding:0 12px}
+.fl button[aria-pressed="true"]{background:var(--tc,var(--accentbg));color:var(--ink);border-color:var(--td,var(--accent));font-weight:700}
+.fl button[data-i]:before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--td);margin-right:6px}
+.ob i{width:8px;height:8px;border-radius:50%;flex:none}
+/* 팀 명단: 칸 높이를 맞추지 않고 위에서부터 채움 */
+.teams{column-count:3;column-gap:12px}
+.teams.one{column-count:1;max-width:560px}
+.team{break-inside:avoid;margin:0 0 12px;overflow:hidden;border-color:var(--td,var(--line))}
+.th{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:11px 14px 8px;background:var(--tc,transparent)}
+.th h3{margin:0;font-size:17px;font-weight:800}
+.th span{font-size:14px;color:var(--sub);font-variant-numeric:tabular-nums}
+.th span b{color:var(--accent);font-size:16px}
+.th span.warn b{color:var(--off)}
+.list{list-style:none;margin:0;padding:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px;min-height:46px;border-top:1px solid var(--line)}
+.who{display:flex;align-items:center;gap:6px;min-width:0}
+.nm{font-size:17px;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.row.lead .nm{font-weight:800}
+.badge{flex:none;font-size:11px;font-weight:700;color:var(--accent);background:var(--accentbg);border-radius:5px;padding:1px 6px}
+.st{flex:none;font-size:14px;font-weight:600;color:var(--mute);white-space:nowrap;text-align:right}
+.row.off .st,.row.leave .st,.row.unk .st{border-radius:8px;padding:2px 10px}
+.row.off .st{color:var(--off);background:var(--offbg)}
+.row.leave .st{color:var(--leave);background:var(--leavebg)}
+.row.unk .st{color:var(--warn);background:var(--warnbg)}
+.row.off .nm,.row.leave .nm{color:var(--sub)}
+.row.away .st{color:var(--away);background:var(--awaybg);border-radius:8px;padding:2px 10px}
+.ob.away{background:var(--awaybg);color:var(--away)}
+.m td.a{background:var(--awaybg);color:var(--away);font-weight:700}
+.row.half .st{color:var(--leave);background:var(--leavebg);border-radius:8px;padding:2px 10px}
+/* 월 전체 */
+.mwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);-webkit-overflow-scrolling:touch}
+table.m{border-collapse:separate;border-spacing:0;font-size:13px;width:100%}
+.m th,.m td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--line);min-width:32px;font-variant-numeric:tabular-nums}
+.m thead th{position:sticky;top:0;background:var(--soft);font-weight:700;color:var(--sub)}
+.m th.sat{color:var(--leave)}.m th.sun{color:var(--off)}
+.m .nmc{position:sticky;left:0;background:var(--card);text-align:left;padding:6px 10px;min-width:96px;font-weight:600;font-size:14px;white-space:nowrap;z-index:1;border-right:1px solid var(--line)}
+.m thead .nmc{background:var(--soft);z-index:2}
+.m tr.tm td{background:var(--soft);text-align:left;font-weight:800;padding:6px 10px;color:var(--sub)}
+.m td.o{background:var(--offbg);color:var(--off);font-weight:700}
+.m td.l{background:var(--leavebg);color:var(--leave);font-weight:700}
+.m td.u{background:var(--warnbg);color:var(--warn);font-weight:700}
+.m .cur{box-shadow:inset 2px 0 0 var(--accent),inset -2px 0 0 var(--accent)}
+.m .ld{font-weight:800}
+.m .ld i{font-style:normal;font-size:10px;color:var(--accent);margin-left:3px}
+footer{font-size:13px;color:var(--mute);line-height:1.7}
+.err{color:var(--off);font-weight:500}
+.team.dir{column-span:all}
+.team.dir .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.row.sched .st{color:var(--accent);background:var(--accentbg);border-radius:8px;padding:2px 10px}
+.m td.s{background:var(--accentbg);color:var(--accent);font-weight:700}
+.wkbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.wkbar b{font-size:16px}
+.wkbar button{min-height:40px;padding:0 14px;border:1px solid var(--line);background:var(--card);border-radius:10px;font-weight:500}
+table.wk th,table.wk td{min-width:44px;font-size:14px;padding:9px 4px}
+table.wk th{cursor:pointer}
+table.wk td{white-space:nowrap}
+.m td.w{color:var(--mute);font-weight:400}
+.m td.n{color:var(--mute);background:var(--soft)}
+.nb{padding:12px 16px}
+.nb h2{margin:0 0 6px;font-size:15px;font-weight:800;color:var(--accent)}
+.nb ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.nb li{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;line-height:1.5}
+.nb li .tx{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}
+.nb li.imp .tx{font-weight:800}
+.nb .until{font-size:13px;color:var(--mute);white-space:nowrap}
+.nb .ib{font-size:11px;font-weight:800;background:var(--offbg);color:var(--off);border-radius:5px;padding:1px 6px}
+.nb.example{border-style:dashed}
+.nbh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.nbh h2{margin:0}
+.nbbtn{min-height:36px;padding:0 14px;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;font-weight:600;color:var(--sub)}
+.nbbtn.pri{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.nbbtn:disabled{opacity:.6}
+.nbempty{margin:0;color:var(--mute);font-size:14px}
+.nb li .meta{font-size:13px;color:var(--sub)}
+.nb li .by{font-weight:700;color:var(--ink)}
+.nbdel{border:0;background:transparent;color:var(--mute);font-size:13px;text-decoration:underline;padding:6px 4px;min-height:32px}
+.nbconf{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--soft);border-radius:8px;padding:8px 10px;font-size:14px}
+.nbform{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.nbform label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--sub);min-width:0}
+.nbform label.wide,.nbform .nbnote,.nbform .nbact{grid-column:1/-1}
+.nbform label.chk{flex-direction:row;align-items:center;gap:8px;font-size:15px;color:var(--ink)}
+.nbform input,.nbform textarea,.nbconf input{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px;width:100%;min-width:0}
+.nbform input[type=checkbox]{width:20px;min-height:20px;padding:0}
+.nbconf input{width:160px}
+.nbform small{font-size:12px;color:var(--mute)}
+.nbnote{margin:0;font-size:13px;color:var(--warn);background:var(--warnbg);border-radius:8px;padding:8px 10px}
+.nbact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nb .err{font-size:13px}
+ (max-width:700px){.nbform{grid-template-columns:1fr}}
+@media (max-width:700px){table.wk th,table.wk td{min-width:34px;padding:9px 2px;font-size:13px}table.wk .nmc{min-width:78px;padding:6px 6px;font-size:13px}}
+@media (max-width:1100px){.teams{column-count:2}}
+@media (max-width:700px){
+ .teams,.teams.one{column-count:1;max-width:none}
+ .date{font-size:21px}.date .yr,.date .tdy{display:none}
+ .weekhead>span{font-size:12px}.pick>span{display:none}
+ .nav button{padding:0 12px}
+ .num b{font-size:22px}.num span{font-size:12px}
+ .sum{padding:10px 12px}
+}
+@media (max-width:380px){.nav button{padding:0 9px;min-width:40px}.date{font-size:19px}}
+</style>
+<div class="wrap" id="root">
+ <div class="hdr">
+  <h1 class="date" id="date"></h1>
+  <div class="nav"><button id="prev" aria-label="전날">◀</button><button id="today">오늘</button><button id="next" aria-label="다음날">▶</button></div>
+ </div>
+ <div id="notices"></div>
+ <section class="card nb" id="nb" hidden aria-label="공지"></section>
+ <section class="card sum" aria-label="오늘 요약">
+  <div class="nums">
+   <div class="num"><span>출근</span><b id="cw">-</b><b id="ctot" style="font-weight:500"></b></div>
+   <div class="num"><span>팀장 출근</span><b id="ct">-</b></div>
+   <div class="num o"><span>휴무</span><b id="co">-</b></div>
+   <div class="num l"><span>연차·반차</span><b id="cl">-</b></div>
+  </div>
+  <div class="leadline" id="leadSum"></div>
+  <div class="outs" id="out"></div>
+  <div class="outs" id="away" hidden></div>
+ </section>
+ <section class="card weekbox" aria-label="주간 날짜 선택">
+  <div class="weekhead"><span>날짜를 눌러 이동 · 붉은 숫자 = 쉬는 인원</span><label class="pick"><span>날짜 선택</span><input type="date" id="pick" aria-label="날짜 선택"></label></div>
+  <div class="week" id="week"></div>
+ </section>
+ <div class="tools">
+  <div class="seg" role="group" aria-label="화면 선택"><button id="tDay" aria-pressed="true">팀별 보기</button><button id="tWeek" aria-pressed="false">주간</button><button id="tMonth" aria-pressed="false">월 전체</button></div>
+  <div class="fl" id="filter" role="group" aria-label="팀 선택"></div>
+ </div>
+ <div class="teams" id="teams"></div>
+ <div class="wkbar" id="wkbar" hidden></div>
+ <div class="mwrap" id="month" hidden></div>
+ <footer id="foot"></footer>
+</div>
+<script>
+const SHEET_ID="1iC-abOUwGQcxvf6wy8hZHt6_ZnBsnx_SLdJ8bSSJR5w";
+// ★ 정확한 연결: 알림_AppsScript.gs 를 시트에 설치하고 웹앱으로 배포한 주소(…/exec)를 여기에 붙여넣으세요.
+//   비워 두면 구글 기본 방식(gviz)을 쓰는데, 이 방식은 일부 칸(OFF·업무명 등)이 빠질 수 있습니다.
+const SCRIPT_URL="";
+// ★ 무료 구성(Apps Script 없이): 아래 값을 채우면 서버 없이 동작합니다. (설정 방법은 배포_가이드.md)
+//   SHEETS_API_KEY : 구글 클라우드의 Google Sheets API 키 → 시트를 빠짐없이 정확히 읽음 (SCRIPT_URL 보다 우선)
+//   SUPABASE_URL / SUPABASE_KEY : 공지 저장용 Supabase 프로젝트 주소와 공개(anon/publishable) 키 → 공지를 모두에게 공유
+const SHEETS_API_KEY="";
+const SUPABASE_URL="https://accecvdzyecwfbffyopd.supabase.co";
+const SUPABASE_KEY="sb_publishable_i_uHbI5alkq-Zt-bmzHZfg_Pa_Ei-pe";
+const REMOTE=!!(SUPABASE_URL||SCRIPT_URL);   // 공지를 모두와 공유하는 저장소가 있는지
+
+// ★ 설정 (여기만 고치면 됩니다)
+// 1) 시트에 "팀" 열과 "팀장" 열(팀장이면 O 또는 "팀장")을 추가하면 아래 TEAMS/LEADERS 대신 시트 값을 자동으로 사용합니다.
+const TEAMS=[
+ {name:"상담",members:["이연희","정보경","도송이"]},
+ {name:"간호",members:["김혜정","박지영","이하은","김은지","주록희","지초은"]},
+ {name:"접수",members:["하정아","이혜원","윤정민"]},
+ {name:"에스테틱",members:["윤소정","김혜진","백유리","장수빈","박지민","오도경"]},
+ {name:"행정",members:["류경화","박상오"]}
+];
+const LEADERS=["김혜정","이연희","정보경","도송이","류경화","박상오","윤소정","하정아"];
+// 원장단: 직원 인원 통계에는 넣지 않고 "원장단" 카드에 따로 표시합니다.
+// 시트의 원장 행 칸에 적은 글자(예: 수술, 외래, 오전진료)는 그날의 진료 스케줄로 표시됩니다. 빈칸은 근무, OFF·연차는 휴무로 봅니다.
+const DIRECTORS=["김양제","장봉석","김경민","최재혁","정수희"];
+// 공지: 구글시트에 "공지" 탭을 만들고 첫 줄에 [내용 | 시작일 | 종료일 | 중요] 를 적은 뒤 아래로 공지를 추가합니다.
+const NOTICE_TAB="공지";
+// 2) 그냥 근무로 보는 표기. 이 목록·숫자·OFF·연차·반차 외의 모든 글자는 출장(외근)으로 표시됩니다.
+//    ("경1.5" 같은 경조사 표기는 자동으로 연차로 처리됩니다.)
+const WORKTAGS=["수납","출","출근"];   // 그냥 근무로 보는 표기 (이름 옆에 따로 표시하지 않음)
+// 원내에 없는 것으로 보는 표기(출근으로 세되 "원내에 없음"으로 표시). 칸의 글자에 아래 단어가 들어 있으면 인식합니다.
+// "출장", "외근"은 항상 인식합니다. 목록에 없는 도시·행사명이 나오면 여기에 추가하세요.
+const AWAYTAGS=["BIMTC","학회","세미나","연수",
+ "도쿄","나고야","오사카","후쿠오카","삿포로","교토","요코하마","고베","오키나와","일본",
+ "서울","부산","대구","인천","광주","대전","울산","세종","수원","제주","강원","전주","청주","창원",
+ "상하이","베이징","홍콩","마카오","타이베이","타이완","대만","중국","싱가포르","방콕","태국","하노이","호치민","베트남","마닐라","쿠알라룸푸르","발리","자카르타",
+ "뉴욕","LA","시카고","샌프란시스코","미국","런던","파리","베를린","독일","프랑스","영국","시드니","호주","두바이","캐나다","토론토"];
+// 3) 공휴일/휴진일 표시 (YYYY-MM-DD)
+const HOLIDAYS={"2026-12-25":"성탄절","2027-01-01":"신정"};
+const REFRESH_MS=120000;
+
+// 구글시트에 접속하지 못할 때 보여줄 예비 데이터 (2026.11 시트 스냅샷)
+const FALLBACK={y:2026,m:11,csv:`,이름,일,월,화,수,목,금,토,일,월,화,수,목,금,토,일,월,화,수,목,금,토,일,월,화,수,목,금,토,일,월,,,
+ ,날짜,1일,2일,3일,4일,5일,6일,7일,8일,9일,10일,11일,12일,13일,14일,15일,16일,17일,18일,19일,20일,21일,22일,23일,24일,25일,26일,27일,28일,29일,30일,,,연차
+1,김양제,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2,장봉석,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+3,김경민,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+4,최재혁,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+5,정수희,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+1,김혜정,,,,OFF,,,,,,,OFF,,,1,,,,OFF,,,,,,,,1,OFF,1,,,,,3
+2,이연희,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,0
+3,정보경,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,,0
+4,도송이,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,,,0
+5,박지영,,,,,,OFF,,,,,OFF,,,,,,,,0.5,OFF,,,,,OFF,,,,,,,,0.5
+6,이하은,,,,,OFF,,,,,,,OFF,1,,,,,,OFF,,,,,,,OFF,,,,,,,1
+7,김은지,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,,,0
+8,주록희,,,0.5,0.5,OFF,1,1,,,0.5,,OFF,1,,,,0.5,1,OFF,,,,,0.5,1,OFF,,,,,,,7.5
+9,지초은,,OFF,,1,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,1
+10,하정아,,,,,OFF,,,,,,,OFF,,,,,,,OFF,,,,,OFF,,,,,,,,,0
+11,이혜원,,,,,OFF,,,,,,OFF,,,,,,,OFF,,,,,,,,OFF,,,,,,,0
+12,윤정민,,,,OFF,,,,,,,,OFF,,,,,,,OFF,,,,,,OFF,,,,,,,,0
+13,윤소정,,,,,OFF,,,,,,,,OFF,,,,OFF,,,,,,,,,,OFF,1,,OFF,,,1
+14,김혜진,,,1,,,OFF,,,1,OFF,1,1,1,1,,OFF,,,,,,,,OFF,,,,,,,,,6
+15,백유리,,,,OFF,,,,,,,OFF,,,,,,,,,OFF,1,,,,,OFF,,,,,,,1
+16,장수빈,,OFF,,,,,,,OFF,,,,,,,,,OFF,1,,,,OFF,,,,,,,,,,1
+17,박지민,,1,OFF,,,,,,,,OFF,,,1,,OFF,,,,,,,,,OFF,,,,,,,,2
+18,오도경,,,,OFF,,,,,,,,OFF,,,,,,OFF,,,,,,,OFF,,,,,OFF,,,0
+19,류경화,,,,,수납,,SMS,,,,,수납,BIMTC,BIMTC,,,,,수납,,OFF,,,,0.5,1,1,OFF,,,,,2.5
+20,박상오,,,,나고야,나고야,나고야,SMS,,,,,,나고야,나고야,나고야,,,,,,,,,,,,,,,,,,0
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,24
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,, ,,,,,　,,,,,,,,,,,`};
+const $=id=>document.getElementById(id);
+const DOW=["일","월","화","수","목","금","토"];
+const cache={}, prevSnap={}, fb={}; let sel=new Date(); sel.setHours(0,0,0,0);
+let lastErr="", changes=[], tab="day", lastOk=null, teamFilter="전체";
+
+function parseCSV(t){const rows=[];let r=[],c="",q=false;for(let i=0;i<t.length;i++){const ch=t[i];
+ if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
+ else if(ch=='"')q=true;else if(ch==","){r.push(c);c=""}else if(ch=="\n"){r.push(c);rows.push(r);r=[];c=""}else if(ch!="\r")c+=ch}
+ if(c||r.length){r.push(c);rows.push(r)}return rows}
+
+function buildMonth(rows){
+ const head=rows.find(r=>r.some(c=>/^\d+일$/.test(String(c).trim())))||[];
+ const dayCol={};head.forEach((c,i)=>{const m=String(c).trim().match(/^(\d+)일$/);if(m)dayCol[+m[1]]=i});
+ const nh=rows.find(r=>String(r[1]).trim()==="이름")||[];
+ const teamCol=nh.findIndex(c=>String(c).trim()==="팀");
+ const leadCol=nh.findIndex(c=>["팀장","직책"].includes(String(c).trim()));
+ const people=[];
+ for(const r of rows){const no=String(r[0]).trim(),name=String(r[1]).trim();
+  if(!/^\d+$/.test(no)||!name)continue;
+  const cells={};for(const d in dayCol)cells[d]=String(r[dayCol[d]]??"").trim();
+  const p={name,cells};
+  if(teamCol>=0)p.team=String(r[teamCol]??"").trim();
+  if(leadCol>=0)p.leader=/^(o|○|y|팀장|1)$/i.test(String(r[leadCol]??"").trim());
+  people.push(p)}
+ return people}
+
+// 구글은 없는 탭 이름을 요청하면 오류 대신 '다른 탭'을 돌려주므로, 날짜 머리글이 해당 월 달력과 맞는지 검사한다.
+function validateRows(rows,y,m){
+ const hi=rows.findIndex(r=>r.some(c=>/^\d+일$/.test(String(c).trim())));
+ if(hi<0)return"날짜 머리글 없음";
+ const head=rows[hi],days=new Date(y,m,0).getDate();
+ const col={};head.forEach((c,i)=>{const k=String(c).trim().match(/^(\d+)일$/);if(k)col[+k[1]]=i});
+ if(!col[1])return"1일 칸 없음";
+ if(Object.keys(col).length!==days)return`일수 ${Object.keys(col).length}≠${days}`;
+ // 요일 줄은 날짜 줄의 바로 아래 또는 바로 위에 있을 수 있다 (시트마다 순서가 다름)
+ let bad="";
+ for(const wk of [rows[hi+1]||[],rows[hi-1]||[]]){bad="";
+  for(let d=1;d<=days;d++)if(String(wk[col[d]]??"").trim()!==DOW[new Date(y,m-1,d).getDay()]){bad=`${d}일 요일 불일치`;break}
+  if(!bad)return""}
+ return bad;}
+
+// 구글 Sheets API 로 읽기: 없는 탭이면 오류를 돌려주고, 칸 값이 빠지지 않는다 (API 키는 호스팅 주소로만 쓰게 제한해 두세요)
+function loadViaApi(name){
+ const u=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent("'"+name+"'")}?key=${encodeURIComponent(SHEETS_API_KEY)}&valueRenderOption=FORMATTED_VALUE`;
+ return fetch(u).then(async r=>{
+  if(!r.ok){let m="";try{m=(await r.json()).error.message||""}catch(e){}
+   throw new Error(r.status==400&&/range|parse/i.test(m)?`'${name}' 시트 탭을 찾을 수 없습니다`:`구글시트 연결 오류 (${r.status}${m?": "+m:""})`)}
+  const j=await r.json();
+  return (j.values||[]).map(row=>row.concat(Array(40).fill("")).slice(0,40).map(c=>c==null?"":String(c)))})}
+function loadRaw(name){if(SHEETS_API_KEY)return loadViaApi(name);return new Promise((res,rej)=>{
+ const cb="__gv"+Math.random().toString(36).slice(2);
+ const s=document.createElement("script");
+ const t=setTimeout(()=>{cleanup();rej(new Error("응답 시간 초과"))},10000);
+ function cleanup(){clearTimeout(t);delete window[cb];s.remove()}
+ window[cb]=j=>{cleanup();
+  let rows;
+  if(SCRIPT_URL){if(!j||!j.ok)return rej(new Error(`'${name}' 시트 탭을 찾을 수 없습니다`));rows=j.rows.map(r=>r.concat(Array(40).fill("")).slice(0,40).map(c=>c==null?"":String(c)))}
+  else{if(j.status!=="ok")return rej(new Error(`'${name}' 시트 탭을 찾을 수 없습니다`));
+   rows=j.table.rows.map(r=>(r.c||[]).concat(Array(40).fill(null)).slice(0,40).map(c=>c&&c.v!=null?String(c.v):""))}
+  res(rows)};
+ s.onerror=()=>{cleanup();rej(new Error("구글시트에 연결할 수 없습니다"))};
+ s.src=SCRIPT_URL?`${SCRIPT_URL}${SCRIPT_URL.includes("?")?"&":"?"}sheet=${name}&callback=${cb}&_=${Date.now()}`
+  :`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:${cb}&sheet=${name}&headers=0&_=${Date.now()}`;
+ document.head.appendChild(s)})}
+function loadJSONP(y,m){
+ const name=String(y%100).padStart(2,"0")+"."+String(m).padStart(2,"0");
+ return loadRaw(name).then(rows=>{const bad=validateRows(rows,y,m);
+  if(bad)throw new Error(`'${name}' 시트 탭이 없거나 달력과 맞지 않습니다 (${bad})`);return rows})}
+
+// ---- 공지 ----
+// 공지는 구글시트의 "공지" 탭에 저장됩니다. 페이지에서 작성하면 Apps Script(SCRIPT_URL)가 그 탭에 한 줄씩 추가합니다(탭이 없으면 자동 생성).
+// SCRIPT_URL 이 비어 있으면 "체험 모드": 이 기기의 브라우저에만 저장되어 다른 직원에게는 보이지 않습니다.
+let notices=null;   // 시트에서 읽은 공지 (null=아직 안 읽음)
+let localNotices=[], formOpen=false, delTarget=null;
+try{localNotices=JSON.parse(localStorage.getItem("wk-local-notices")||"[]").map(n=>({...n,start:n.start?new Date(n.start):null,end:n.end?new Date(n.end):null,local:true}))}catch(e){}
+function saveLocal(){try{localStorage.setItem("wk-local-notices",JSON.stringify(localNotices))}catch(e){}}
+function parseDate(s){
+ s=String(s??"").trim();if(!s)return null;
+ let m=s.match(/^Date\((\d+),(\d+),(\d+)/);if(m)return new Date(+m[1],+m[2],+m[3]);
+ m=s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3]);
+ m=s.match(/^(\d{1,2})\s*[\/.\-월]\s*(\d{1,2})/);if(m)return new Date(new Date().getFullYear(),+m[1]-1,+m[2]);
+ return null}
+function parseNotices(rows){
+ const hi=rows.findIndex(r=>r.some(c=>String(c).trim()==="내용"));
+ if(hi<0)return[];   // 공지 탭이 없으면 구글이 다른 탭을 돌려주므로 '내용' 머리글이 있는 경우만 공지로 본다
+ const h=rows[hi].map(c=>String(c).trim());
+ const ci=h.indexOf("내용"),si=h.findIndex(c=>/시작/.test(c)),ei=h.findIndex(c=>/종료|마감|기한|까지/.test(c)),ii=h.findIndex(c=>/중요/.test(c)),ai=h.findIndex(c=>/작성자/.test(c)),ti=h.findIndex(c=>/작성시각/.test(c));
+ const out=[];
+ rows.slice(hi+1).forEach((r,k)=>{const text=String(r[ci]??"").trim();if(!text)return;
+  out.push({text,start:si>=0?parseDate(r[si]):null,end:ei>=0?parseDate(r[ei]):null,imp:ii>=0&&/^(o|○|y|1|중요)$/i.test(String(r[ii]??"").trim()),
+   author:ai>=0?String(r[ai]??"").trim():"",ts:ti>=0?String(r[ti]??"").trim():"",row:hi+2+k})});
+ return out}
+// Supabase: 읽기는 공개, 쓰기·삭제는 비밀번호를 확인하는 DB 함수(add_notice / delete_notice)로만 가능 (supabase_setup.sql 참고)
+const sbHeaders={apikey:SUPABASE_KEY,"Content-Type":"application/json"};
+function localTs(iso){const d=new Date(iso);return isNaN(d)?"":ymd(d)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+async function loadSupabaseNotices(){
+ const r=await fetch(`${SUPABASE_URL}/rest/v1/wk_notices?select=id,text,author,start_date,end_date,important,created_at&order=created_at.desc&limit=200`,{headers:sbHeaders});
+ if(!r.ok)throw new Error("공지를 불러오지 못했습니다 ("+r.status+")");
+ return (await r.json()).map(n=>({id:n.id,text:n.text,author:n.author,start:parseDate(n.start_date),end:parseDate(n.end_date),imp:!!n.important,ts:localTs(n.created_at)}))}
+async function sbRpc(fn,body){
+ const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{method:"POST",headers:sbHeaders,body:JSON.stringify(body)});
+ if(r.ok)return{ok:true};
+ let m="";try{m=(await r.json()).message||""}catch(e){}
+ return{ok:false,error:m||`요청 실패 (${r.status})`}}
+async function loadNotices(){
+ try{notices=SUPABASE_URL?await loadSupabaseNotices():parseNotices(await loadRaw(NOTICE_TAB))}catch(e){if(notices===null)notices=[]}}
+function scriptCall(params){return new Promise((res,rej)=>{
+ const cb="__sc"+Math.random().toString(36).slice(2);const s=document.createElement("script");
+ const t=setTimeout(()=>{done();rej(new Error("응답 시간 초과"))},15000);
+ function done(){clearTimeout(t);delete window[cb];s.remove()}
+ window[cb]=j=>{done();res(j||{ok:false,error:"응답이 없습니다"})};
+ s.onerror=()=>{done();rej(new Error("연결할 수 없습니다"))};
+ const q=Object.entries({...params,callback:cb,_:Date.now()}).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
+ s.src=SCRIPT_URL+(SCRIPT_URL.includes("?")?"&":"?")+q;document.head.appendChild(s)})}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function fmtTs(ts){const m=String(ts||"").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\D+(\d{1,2}:\d{2}))?/);return m?`${+m[2]}/${+m[3]}${m[4]?" "+m[4]:""}`:""}
+function nowStr(){const d=new Date();return ymd(d)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+function renderNoticeBoard(force){
+ if((formOpen||delTarget)&&!force)return;   // 입력 중에는 자동 갱신이 입력칸을 지우지 않도록 건너뜀
+ const today=new Date();today.setHours(0,0,0,0);
+ const all=[...(notices||[]),...localNotices];
+ let list=all.filter(n=>(!n.start||n.start<=today)&&(!n.end||today<=n.end)).sort((a,b)=>(b.imp?1:0)-(a.imp?1:0));
+ let ex=false;
+ if(!list.length&&Object.values(fb).some(Boolean)){ex=true;list=[{text:"예시 공지입니다. 아래 '공지 작성'으로 작성자 이름과 종료일을 넣어 공지를 올릴 수 있습니다. 종료일이 지나면 저절로 사라집니다.",example:true}]}
+ const box=$("nb");box.hidden=false;box.classList.toggle("example",ex);
+ const items=list.map((n,i)=>{
+  const meta=[n.author?`<b class="by">${esc(n.author)}</b>`:"",fmtTs(n.ts)||(n.local?"":""),n.local?"이 기기에만 저장":""].filter(Boolean).join(" · ");
+  const until=n.end?`<span class="until">${+n.end==+today?"오늘까지":"~"+fmtMD(n.end)+"까지"}</span>`:"";
+  const conf=delTarget===n?`<div class="nbconf"><span>이 공지를 삭제할까요?</span>${n.local||!REMOTE?"":`<input type="password" id="delPin" placeholder="비밀번호" autocomplete="off" aria-label="비밀번호">`}<button type="button" class="nbbtn" id="delOk">삭제</button><button type="button" class="nbbtn" id="delNo">취소</button><span class="err" id="nbErr"></span></div>`:"";
+  return `<li class="${n.imp?"imp":""}">${n.imp?`<span class="ib">중요</span>`:""}<span class="tx">${esc(n.text)}</span>${meta?`<span class="meta">${meta}</span>`:""}${until}${n.example?"":`<button type="button" class="nbdel" data-i="${i}">삭제</button>`}${conf}</li>`}).join("");
+ let author="";try{author=localStorage.getItem("wk-author")||""}catch(e){}
+ const form=formOpen?`<form id="nbForm" class="nbform">
+  <label>작성자 <input id="nfAuthor" required maxlength="30" value="${esc(author)}" placeholder="이름"></label>
+  <label class="wide">공지 내용 <textarea id="nfText" required maxlength="500" rows="3" placeholder="공지할 내용을 적어 주세요"></textarea></label>
+  <label>종료일 <input type="date" id="nfEnd" min="${ymd(today)}"><small>비우면 계속 표시</small></label>
+  <label class="chk"><input type="checkbox" id="nfImp"> 중요 공지</label>
+  ${REMOTE?`<label>비밀번호 <input type="password" id="nfPin" autocomplete="off"></label>`:`<p class="nbnote">체험 모드입니다. 이 공지는 이 기기의 브라우저에만 저장되며 다른 직원에게는 보이지 않습니다. (Supabase 또는 Apps Script 연결을 설정하면 모두에게 보입니다)</p>`}
+  <div class="nbact"><button class="nbbtn pri" type="submit" id="nfOk">등록</button><button type="button" class="nbbtn" id="nfCancel">취소</button><span class="err" id="nbErr"></span></div></form>`:"";
+ box.innerHTML=`<div class="nbh"><h2>공지${ex?" (예시)":""}</h2><button type="button" class="nbbtn" id="nbAdd">${formOpen?"닫기":"＋ 공지 작성"}</button></div>`+(list.length?`<ul>${items}</ul>`:`<p class="nbempty">등록된 공지가 없습니다.</p>`)+form;
+ $("nbAdd").onclick=()=>{formOpen=!formOpen;delTarget=null;renderNoticeBoard(true);if(formOpen)$("nfAuthor").focus()};
+ document.querySelectorAll(".nbdel").forEach(b=>b.onclick=()=>{delTarget=list[+b.dataset.i];formOpen=false;renderNoticeBoard(true)});
+ const no=$("delNo");if(no)no.onclick=()=>{delTarget=null;renderNoticeBoard(true)};
+ const ok=$("delOk");if(ok)ok.onclick=async()=>{
+  const n=delTarget,err=$("nbErr");
+  if(n.local||!REMOTE){localNotices=localNotices.filter(x=>x!==n);saveLocal();delTarget=null;renderNoticeBoard(true);return}
+  ok.disabled=true;err.textContent="";
+  try{const pin=$("delPin")?$("delPin").value:"";
+   const j=SUPABASE_URL?await sbRpc("wk_delete_notice",{p_pin:pin,p_id:n.id}):await scriptCall({action:"delNotice",row:n.row,ts:n.ts,pin});
+   if(!j.ok){err.textContent=j.error||"삭제하지 못했습니다";ok.disabled=false;return}
+   delTarget=null;await loadNotices();renderNoticeBoard(true)}
+  catch(e){err.textContent=e.message;ok.disabled=false}};
+ const f=$("nbForm");if(f){$("nfCancel").onclick=()=>{formOpen=false;renderNoticeBoard(true)};
+  f.onsubmit=async ev=>{ev.preventDefault();
+   const au=$("nfAuthor").value.trim(),tx=$("nfText").value.trim(),en=$("nfEnd").value,im=$("nfImp").checked,err=$("nbErr");
+   if(!au||!tx){err.textContent="작성자와 내용을 입력하세요";return}
+   try{localStorage.setItem("wk-author",au)}catch(e){}
+   if(!REMOTE){const e2=en?parseDate(en):null;localNotices.push({text:tx,author:au,start:today,end:e2,imp:im,ts:nowStr(),local:true});saveLocal();formOpen=false;renderNoticeBoard(true);return}
+   $("nfOk").disabled=true;err.textContent="등록 중…";
+   try{const pin=$("nfPin")?$("nfPin").value:"";
+    const j=SUPABASE_URL?await sbRpc("wk_add_notice",{p_pin:pin,p_author:au,p_text:tx,p_end:en||null,p_imp:im}):await scriptCall({action:"addNotice",author:au,text:tx,end:en,imp:im?"O":"",pin});
+    if(!j.ok){err.textContent=j.error||"등록하지 못했습니다";$("nfOk").disabled=false;return}
+    formOpen=false;await loadNotices();renderNoticeBoard(true)}
+   catch(e){err.textContent=e.message;$("nfOk").disabled=false}}}}
+
+// ---- 칸 값 해석 ----
+function classify(v,dir){
+ const t=String(v).trim();
+ if(/^off$/i.test(t))return{t:"off"};
+ if(t==="")return{t:"work"};
+ if(!isNaN(t)){const n=+t;return n>0?{t:"leave",tag:n>=1?"연차":"반차",half:n<1}:{t:"work"}}
+ if(/반차/.test(t))return{t:"leave",tag:/오전/.test(t)?"오전반차":/오후/.test(t)?"오후반차":"반차",half:true};
+ if(WORKTAGS.includes(t))return{t:"work"};
+ if(/출장|외근/.test(t)||AWAYTAGS.some(k=>t.toUpperCase().includes(k.toUpperCase())))return{t:"work",tag:t,away:true};   // 출장·외근·지명은 출근으로 세되 원내에 없음으로 표시
+ if(/^경\d*(\.\d+)?$/.test(t)||/경조/.test(t))return{t:"leave",tag:"연차"};   // 경조사 휴가(출산 등)는 연차 사용으로 처리
+ if(/연차|휴가|월차/.test(t))return{t:"leave",tag:"연차"};
+ if(dir)return{t:"work",tag:t,sched:true};   // 원장: 그 외 글자는 진료 스케줄(수술·외래 등)로 표시
+ return{t:"work",tag:t,away:true}}   // 위에서 정해둔 표기 외의 모든 글자는 출장(외근)으로 본다
+const label=v=>{const c=classify(v);return c.t=="work"?(c.tag||"근무"):c.t=="off"?"OFF":c.t=="unk"?`확인필요(${c.tag})`:c.tag};
+
+// ---- 시트 수정 감지 ----
+function snapOf(people){const o={};people.forEach(p=>o[p.name]=p.cells);return o}
+function diff(a,b,m){const out=[];
+ for(const n in b){const A=a[n];if(!A){out.push(`${n} 추가됨`);continue}
+  for(const d in b[n])if((A[d]??"")!==b[n][d])out.push(`${n} · ${m}/${d}일: ${label(A[d]??"")} → ${label(b[n][d])}`)}
+ for(const n in a)if(!b[n])out.push(`${n} 삭제됨`);
+ return out}
+function detect(y,m,people){
+ const k="wk-snap-"+y+"-"+m,now=snapOf(people);
+ let old=prevSnap[k];
+ if(!old){try{const s=localStorage.getItem(k);if(s)old=JSON.parse(s)}catch(e){}}
+ if(old){const d=diff(old,now,m);if(d.length)changes=changes.concat(d).slice(-30)}
+ prevSnap[k]=now;try{localStorage.setItem(k,JSON.stringify(now))}catch(e){}}
+
+async function getMonth(y,m,force){
+ const k=y+"-"+m; if(cache[k]!==undefined&&!force)return cache[k];
+ try{const rows=await loadJSONP(y,m);cache[k]=buildMonth(rows);fb[k]=false;detect(y,m,cache[k]);lastErr="";lastOk=new Date()}
+ catch(e){lastErr=e.message;
+  if(y==FALLBACK.y&&m==FALLBACK.m){cache[k]=buildMonth(parseCSV(FALLBACK.csv));fb[k]=true}
+  else if(cache[k]===undefined||!cache[k])cache[k]=null}
+ return cache[k]}
+
+// ---- 팀 구조 ----
+function structure(people){
+ const dirs=DIRECTORS.filter(n=>people.some(p=>p.name===n));
+ people=people.filter(p=>!DIRECTORS.includes(p.name));
+ const names=people.map(p=>p.name);
+ const fromSheet=people.some(p=>p.team);
+ let groups=[],lead=new Set();
+ if(fromSheet){const map={},order=[];
+  people.forEach(p=>{const t=p.team||"미배정";if(!map[t]){map[t]=[];order.push(t)}map[t].push(p.name);if(p.leader)lead.add(p.name)});
+  groups=order.map(t=>({name:t,list:map[t]}))}
+ else{LEADERS.forEach(n=>lead.add(n));
+  groups=TEAMS.map(t=>({name:t.name,list:t.members.filter(n=>names.includes(n))}));
+  const used=new Set(groups.flatMap(g=>g.list));const rest=names.filter(n=>!used.has(n));
+  if(rest.length)groups.push({name:"미배정",list:rest})}
+ const teamOf={};groups.forEach(g=>g.list.forEach(n=>teamOf[n]=g.name));
+ return{groups,lead,teamOf,dirs}}
+const cidx=name=>name==="원장단"?5:((window.TI&&TI[name])||0)%5;   // 팀 색 번호 (원장단은 5번)
+const isOut=c=>c.t=="off"||(c.t=="leave"&&!c.half);
+const fmtMD=d=>`${d.getMonth()+1}/${d.getDate()}`;
+
+// 연속 연차: 오늘부터 이어지는 연차의 마지막 날짜 (사이에 낀 OFF는 이어진 것으로 본다. 달이 바뀌어도 다음 달 시트를 읽는다)
+async function leaveEnd(name,start){
+ let end=null;const dt=new Date(start);
+ for(let i=0;i<62;i++){
+  const ppl=await getMonth(dt.getFullYear(),dt.getMonth()+1);
+  const p=ppl&&ppl.find(x=>x.name===name);if(!p)break;
+  const c=classify(p.cells[dt.getDate()]??"");
+  if(c.t=="leave"&&!c.half)end=new Date(dt);
+  else if(!(c.t=="off"&&i>0))break;
+  dt.setDate(dt.getDate()+1)}
+ return end}
+function stText(c,span){
+ if(c.t=="off")return"OFF";
+ if(c.t=="leave"){return c.half?c.tag+" 근무":(span&&+span>+sel?`${c.tag} ~${fmtMD(span)}`:c.tag)}
+ if(c.away)return c.tag+" · 원외";
+ if(c.sched)return c.tag;
+ if(c.t=="unk")return"확인 필요: "+c.tag;
+ return c.tag||"근무"}
+
+function row(n,c,lead,span){
+ return `<li class="row ${c.t}${c.away?" away":""}${c.sched?" sched":""}${c.half?" half":""}${lead?" lead":""}"><span class="who"><span class="nm">${n}</span>${lead?`<span class="badge">팀장</span>`:""}</span><span class="st">${stText(c,span)}</span></li>`}
+
+function renderNotices(extra){
+ let h="";
+ const key=(sel.getFullYear())+"-"+(sel.getMonth()+1);
+ if(fb[key])h+=`<div class="notice danger" role="alert"><b>⚠ 구글시트에 연결하지 못해 저장된 11월 자료를 보고 있습니다</b>최신 근무와 다를 수 있습니다. 시트 확인 후 새로고침하세요. (${lastErr})</div>`;
+ else if(cache[key]===null)h+=`<div class="notice danger" role="alert"><b>이 달의 근무표를 불러오지 못했습니다</b>${lastErr}</div>`;
+ if(!SCRIPT_URL&&!SHEETS_API_KEY&&!fb[key]&&cache[key])h+=`<div class="notice info"><b>임시 연결 방식으로 읽는 중</b>이 방식은 시트의 일부 칸이 누락될 수 있습니다. 관리자는 배포_가이드.md 대로 SHEETS_API_KEY(또는 SCRIPT_URL)를 설정해 주세요.</div>`;
+ if(changes.length)h+=`<div class="notice warn" role="status"><b>🔔 시트가 수정되었습니다 (${changes.length}건)</b><ul>${changes.slice(-5).map(c=>`<li>${c}</li>`).join("")}${changes.length>5?`<li>외 ${changes.length-5}건</li>`:""}</ul><button id="ack">확인</button></div>`;
+ (extra||[]).forEach(e=>h+=e);
+ $("notices").innerHTML=h;
+ const a=$("ack");if(a)a.onclick=()=>{changes=[];renderAll()}}
+
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+
+async function renderAll(){
+ const y=sel.getFullYear(),m=sel.getMonth()+1,d=sel.getDate();
+ const today=new Date();today.setHours(0,0,0,0);
+ const hol=HOLIDAYS[ymd(sel)];
+ $("date").innerHTML=`<span><span class="yr">${y}년 </span>${m}월 ${d}일 ${DOW[sel.getDay()]}요일</span>`+(+sel==+today?`<span class="tag tdy">오늘</span>`:"")+(hol?`<span class="tag hol">${hol}</span>`:"");
+ $("pick").value=ymd(sel);
+ $("today").classList.toggle("on",+sel==+today);
+ if(notices===null)await loadNotices();
+ renderNoticeBoard();
+ const people=await getMonth(y,m);
+ const extra=[];
+ const show=!!people;
+ document.querySelector(".sum").hidden=!show;
+ if(!show){$("teams").innerHTML="";$("month").hidden=true;$("filter").innerHTML="";renderNotices();renderFoot();renderWeek();return}
+ const st=structure(people);
+ window.TI={};st.groups.forEach((g,i)=>TI[g.name]=i);
+ const dirGroup=st.dirs.length?{name:"원장단",list:st.dirs,dir:true}:null;
+ const by={};people.forEach(p=>by[p.name]=classify(p.cells[d]??"",st.dirs.includes(p.name)));
+ let W=0,O=0,L=0,U=0,TL=0;
+ const outs=[],aways=[];
+ st.groups.forEach(g=>g.list.forEach(n=>{const c=by[n];if(!c)return;
+  if(c.t=="off"){O++;outs.push({n,c,team:g.name})}
+  else if(c.t=="leave"){L++;outs.push({n,c,team:g.name});if(c.half)W++}
+  else{W++;if(c.away)aways.push({n,c,team:g.name});if(c.t=="unk"){U++;outs.push({n,c,team:g.name})}}}));
+ // 원장단은 인원 통계에서 빼고, 쉬는 사람·원외 목록에만 표시
+ if(dirGroup)dirGroup.list.forEach(n=>{const c=by[n];if(!c)return;
+  if(c.t=="off"||c.t=="leave")outs.push({n,c,team:"원장단",dir:true});
+  else if(c.away)aways.push({n,c,team:"원장단"})});
+ // 연속 연차 종료일
+ const span={};
+ await Promise.all(outs.filter(o=>o.c.t=="leave"&&!o.c.half).map(async o=>{span[o.n]=await leaveEnd(o.n,sel)}));
+ const total=st.groups.reduce((a,g)=>a+g.list.filter(n=>by[n]).length,0);
+ // 팀장 요약
+ const leaders=[];st.groups.forEach(g=>g.list.forEach(n=>{if(st.lead.has(n)&&by[n])leaders.push({n,c:by[n],team:g.name})}));
+ leaders.forEach(x=>{if(!isOut(x.c))TL++});
+ const absL=leaders.filter(x=>isOut(x.c));
+ $("leadSum").innerHTML=`<strong>팀장 ${TL} / ${leaders.length}명 근무</strong>`+(absL.length?` · 쉬는 팀장: ${absL.map(x=>`${x.n}(${x.team})`).join(", ")}`:"")+(leaders.some(x=>x.c.away)?` · 원내에 없는 팀장: ${leaders.filter(x=>x.c.away).map(x=>`${x.n}(${x.c.tag})`).join(", ")}`:"")+(!absL.length&&!leaders.some(x=>x.c.away)?" · 모든 팀장이 원내에서 근무합니다":"");
+ // 쉬는 사람
+ const rest=outs.filter(o=>o.c.t!="unk");
+ $("out").innerHTML=rest.length?`<span class="t">쉬는 사람 ${rest.length}명</span>`+rest.map(o=>`<span class="ob ${o.c.t}" title="${o.team}"><i style="background:var(--d${cidx(o.team)})"></i>${o.n}<small>${stText(o.c,span[o.n])}</small></span>`).join(""):`<span class="allin">오늘은 전원 출근입니다</span>`;
+ $("away").hidden=!aways.length;
+ $("away").innerHTML=aways.length?`<span class="t">원내에 없음(출장·외근) ${aways.length}명 · 출근에는 포함</span>`+aways.map(o=>`<span class="ob away" title="${o.team}"><i style="background:var(--d${cidx(o.team)})"></i>${o.n}<small>${o.c.tag}</small></span>`).join(""):"";
+ $("cw").textContent=W;$("ctot").innerHTML=`<small> / ${total}명</small>`;
+ $("ct").innerHTML=`${TL}<small> / ${leaders.length}</small>`;$("co").textContent=O;$("cl").textContent=L;
+ if(total&&outs.filter(o=>!o.dir&&isOut(o.c)).length>=total*0.8)extra.push(`<div class="notice info"><b>대부분 쉬는 날입니다</b>휴진일이거나 시트가 아직 입력되지 않았을 수 있습니다.</div>`);
+ renderNotices(extra);
+ // 팀 필터
+ const allGroups=[...(dirGroup?[dirGroup]:[]),...st.groups];
+ const names=["전체",...allGroups.map(g=>g.name)];
+ if(!names.includes(teamFilter))teamFilter="전체";
+ $("filter").innerHTML=names.map((n,i)=>`<button data-n="${n}" ${i?`data-i="${cidx(n)}" style="--tc:var(--c${cidx(n)});--td:var(--d${cidx(n)})"`:""} aria-pressed="${n==teamFilter}">${n}</button>`).join("");
+ document.querySelectorAll("#filter button").forEach(b=>b.onclick=()=>{teamFilter=b.dataset.n;renderAll()});
+ const groups=teamFilter=="전체"?allGroups:allGroups.filter(g=>g.name==teamFilter);
+ // 팀별 / 월 전체
+ $("teams").hidden=tab!="day";$("month").hidden=tab=="day";$("wkbar").hidden=tab!="week";
+ if(tab=="day"){
+  $("teams").classList.toggle("one",groups.length==1);
+  $("teams").innerHTML=groups.map(g=>{
+   const mem=g.list.filter(n=>by[n]);
+   const work=mem.filter(n=>!isOut(by[n])).length;
+   const sorted=[...mem].sort((a,b)=>isOut(by[a])-isOut(by[b])||(st.lead.has(b)-st.lead.has(a)));
+   return `<section class="card team${g.dir?" dir":""}" style="--tc:var(--c${cidx(g.name)});--td:var(--d${cidx(g.name)})"><div class="th"><h3>${g.name}${g.dir?` <small style="font-weight:500;color:var(--sub)">· 오늘 진료 스케줄</small>`:""}</h3><span class="${work<mem.length?"warn":""}">${g.dir?"근무":"출근"} <b>${work}</b> / ${mem.length}명</span></div><ul class="list">${sorted.map(n=>row(n,by[n],st.lead.has(n),span[n])).join("")}</ul></section>`}).join("")}
+ else if(tab=="week")await renderWeekTable({...st,groups});
+ else renderMonth(people,{...st,groups},y,m,d);
+ renderFoot();renderWeek()}
+
+// 주간 보기: 선택한 날짜가 속한 주(일~토)를 팀별 표로 보여준다. 달이 바뀌는 주는 다음 달 시트도 읽는다.
+async function renderWeekTable(st){
+ const start=new Date(sel);start.setDate(sel.getDate()-sel.getDay());
+ const days=[...Array(7)].map((_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});
+ const months={};
+ for(const d of days){const k=d.getFullYear()+"-"+(d.getMonth()+1);if(!(k in months))months[k]=await getMonth(d.getFullYear(),d.getMonth()+1)}
+ const cellOf=(n,d)=>{const ppl=months[d.getFullYear()+"-"+(d.getMonth()+1)];const p=ppl&&ppl.find(x=>x.name===n);return p?classify(p.cells[d.getDate()]??"",st.dirs.includes(n)):null};
+ const e=days[6];
+ $("wkbar").innerHTML=`<button type="button" id="wkPrev">◀ 이전 주</button><b>${fmtMD(start)} ~ ${fmtMD(e)}</b><button type="button" id="wkNext">다음 주 ▶</button>`;
+ $("wkPrev").onclick=()=>go(-7);$("wkNext").onclick=()=>go(7);
+ let h=`<table class="m wk"><thead><tr><th class="nmc">이름</th>${days.map(d=>{const w=d.getDay();return `<th data-t="${+d}" class="${w==0?"sun":w==6?"sat":""}${+d==+sel?" cur":""}">${d.getDate()}<br><small>${DOW[w]}</small></th>`}).join("")}</tr></thead><tbody>`;
+ st.groups.forEach(g=>{h+=`<tr class="tm"><td colspan="8" style="background:var(--c${cidx(g.name)})">${g.name}</td></tr>`;
+  [...g.list].sort((a,b)=>st.lead.has(b)-st.lead.has(a)).forEach(n=>{
+   h+=`<tr><td class="nmc${st.lead.has(n)?" ld":""}">${n}${st.lead.has(n)?"<i>팀장</i>":""}</td>`+days.map(d=>{const c=cellOf(n,d);
+    if(!c)return `<td class="n${+d==+sel?" cur":""}">–</td>`;
+    const cls=c.t=="off"?"o":c.t=="leave"?"l":c.away?"a":c.sched?"s":"w";
+    const tx=c.t=="off"?"OFF":c.t=="leave"?(c.half?"반차":"연차"):(c.tag||"근무");
+    return `<td class="${cls}${+d==+sel?" cur":""}">${tx}</td>`}).join("")+`</tr>`})});
+ $("month").innerHTML=h+`</tbody></table>`;
+ document.querySelectorAll("table.wk th[data-t]").forEach(t=>t.onclick=()=>{sel=new Date(+t.dataset.t);renderAll()})}
+
+function renderMonth(people,st,y,m,d){
+ const days=Object.keys(people[0]?.cells||{}).map(Number);
+ let h=`<table class="m"><thead><tr><th class="nmc">이름</th>${days.map(x=>{const w=new Date(y,m-1,x).getDay();return `<th class="${w==0?"sun":w==6?"sat":""}${x==d?" cur":""}">${x}<br><small>${DOW[w]}</small></th>`}).join("")}</tr></thead><tbody>`;
+ const by={};people.forEach(p=>by[p.name]=p);
+ st.groups.forEach((g,gi)=>{h+=`<tr class="tm"><td colspan="${days.length+1}" style="background:var(--c${cidx(g.name)})">${g.name}</td></tr>`;
+  g.list.filter(n=>by[n]).sort((a,b)=>st.lead.has(b)-st.lead.has(a)).forEach(n=>{
+   h+=`<tr><td class="nmc${st.lead.has(n)?" ld":""}">${n}${st.lead.has(n)?"<i>팀장</i>":""}</td>`+days.map(x=>{const c=classify(by[n].cells[x]??"",st.dirs.includes(n));
+    const cls=c.t=="off"?"o":c.t=="leave"?"l":c.t=="unk"?"u":c.away?"a":c.sched?"s":"";const tx=c.t=="off"?"OFF":c.t=="leave"?(c.half?"반":"연"):c.t=="unk"?"?":(c.tag?c.tag.slice(0,2):"");
+    return `<td class="${cls}${x==d?" cur":""}">${tx}</td>`}).join("")+`</tr>`})});
+ $("month").innerHTML=h+`</tbody></table>`}
+
+function renderFoot(){
+ const t=lastOk?`${String(lastOk.getHours()).padStart(2,"0")}:${String(lastOk.getMinutes()).padStart(2,"0")}`:"-";
+ $("foot").innerHTML=`시트 마지막 확인 ${t} · 2분마다 자동 확인`}
+
+async function renderWeek(){
+ const start=new Date(sel);start.setDate(sel.getDate()-sel.getDay());
+ const today=new Date();today.setHours(0,0,0,0);
+ let h="";
+ for(let i=0;i<7;i++){const dt=new Date(start);dt.setDate(start.getDate()+i);
+  const ppl=await getMonth(dt.getFullYear(),dt.getMonth()+1);
+  const off=ppl?ppl.filter(p=>!DIRECTORS.includes(p.name)&&isOut(classify(p.cells[dt.getDate()]||""))).length:"?";
+  h+=`<div class="day ${+dt==+sel?"sel":""} ${+dt==+today?"today":""}" tabindex="0" role="button" data-t="${+dt}"><span class="${i==0?"sun":i==6?"sat":""}">${DOW[i]}</span><b>${dt.getDate()}</b><i class="${off===0?"z":""}">${off}</i></div>`}
+ $("week").innerHTML=h;
+ document.querySelectorAll(".day").forEach(e=>{const go=()=>{sel=new Date(+e.dataset.t);renderAll()};e.onclick=go;e.onkeydown=ev=>{if(ev.key=="Enter"||ev.key==" "){ev.preventDefault();go()}}})}
+
+function go(n){sel.setDate(sel.getDate()+n);renderAll()}
+$("prev").onclick=()=>go(-1);$("next").onclick=()=>go(1);
+$("today").onclick=()=>{sel=new Date();sel.setHours(0,0,0,0);renderAll()};
+function setTab(v){tab=v;$("tDay").setAttribute("aria-pressed",v=="day");$("tWeek").setAttribute("aria-pressed",v=="week");$("tMonth").setAttribute("aria-pressed",v=="month");renderAll()}
+$("tDay").onclick=()=>setTab("day");$("tWeek").onclick=()=>setTab("week");$("tMonth").onclick=()=>setTab("month");
+$("pick").onchange=e=>{if(!e.target.value)return;const[p,q,r]=e.target.value.split("-").map(Number);sel=new Date(p,q-1,r);renderAll()};
+// 자정이 지나면 새 '오늘'로, 2분마다 열린 달을 백그라운드로 다시 읽어 수정 여부 확인(화면은 깜빡이지 않음)
+let lastDay=new Date().toDateString();
+setInterval(async()=>{
+ if(new Date().toDateString()!==lastDay){lastDay=new Date().toDateString();sel=new Date();sel.setHours(0,0,0,0)}
+ await loadNotices();
+ for(const k of Object.keys(cache)){const [y,m]=k.split("-").map(Number);await getMonth(y,m,true)}
+ renderAll()},REFRESH_MS);
+renderAll();
+</script>
+</body></html>
